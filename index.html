@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="点菜">
+<meta name="theme-color" content="#FFFBF3">
+<title>点菜</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    background: #FFFBF3;
+    color: #2F2A25;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+
+  /* ===== 顶部 ===== */
+  .top {
+    position: sticky; top: 0; z-index: 30;
+    background: rgba(255, 251, 243, .94);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    border-bottom: 1px solid #F0E4D0;
+    padding: calc(8px + env(safe-area-inset-top)) 12px 0;
+  }
+  .titlebar { display: flex; align-items: center; gap: 8px; padding: 2px 4px 10px; }
+  .titlebar h1 { font-size: 20px; margin: 0; font-weight: 700; letter-spacing: 2px; }
+  .titlebar .logo { font-size: 20px; }
+  .searchbox input {
+    width: 100%; border: none; outline: none; border-radius: 10px;
+    background: #F4EBDD; padding: 9px 14px; font-size: 15px; color: #2F2A25;
+    -webkit-appearance: none; appearance: none; font-family: inherit;
+  }
+  .searchbox input::placeholder { color: #A9977C; }
+  .tabs {
+    display: flex; gap: 8px; overflow-x: auto; padding: 10px 0;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button {
+    flex: 0 0 auto; border: 1px solid #E8D9BF; background: #fff; color: #7A6A52;
+    font-size: 13px; padding: 6px 13px; border-radius: 16px; font-family: inherit;
+  }
+  .tabs button:active { background: #F6EEDF; }
+
+  /* ===== 列表 ===== */
+  main { padding: 12px 12px 0; }
+  .card {
+    background: #fff; border-radius: 16px; padding: 14px 14px 2px; margin-bottom: 14px;
+    box-shadow: 0 2px 10px rgba(160, 138, 106, .08);
+  }
+  .card h2 {
+    font-size: 17px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px;
+  }
+  .card h2::before {
+    content: ""; width: 4px; height: 16px; border-radius: 2px; background: #B03A2E;
+  }
+  .group { margin-bottom: 14px; }
+  .group h3 {
+    font-size: 13px; margin: 0 0 9px; font-weight: 600;
+    display: inline-block; padding: 3px 11px; border-radius: 11px;
+  }
+  .group.cold h3 { color: #2E7D6B; background: #E4F2EE; }
+  .group.hot h3 { color: #C0392B; background: #FBE9E2; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    border: 1px solid #E8DCC8; background: #FFFDF9; color: #3A322A;
+    font-size: 14px; padding: 8px 13px; border-radius: 11px;
+    font-family: inherit; transition: transform .12s, background .15s;
+  }
+  .chip:active { transform: scale(.95); }
+  .chip.on {
+    background: #B03A2E; border-color: #B03A2E; color: #fff;
+    box-shadow: 0 2px 8px rgba(176, 58, 46, .3);
+  }
+  .chip.on::after { content: "✓"; margin-left: 6px; font-size: 12px; opacity: .9; }
+
+  /* ===== 底部操作栏 ===== */
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(255, 251, 243, .96);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid #F0E4D0;
+  }
+  .bar .info { font-size: 13px; color: #7A6A52; flex: 0 0 auto; line-height: 1.2; }
+  .bar .info b { color: #B03A2E; font-size: 19px; display: block; }
+  .bar button {
+    border: none; border-radius: 12px; font-family: inherit;
+    font-size: 15px; font-weight: 600; padding: 12px 16px;
+  }
+  #clear { background: #F1E7D6; color: #7A6A52; }
+  #make {
+    flex: 1; background: linear-gradient(135deg, #C0392B, #8E2B21); color: #fff;
+    box-shadow: 0 4px 14px rgba(176, 58, 46, .35);
+  }
+  #make:active, #clear:active { transform: scale(.98); }
+
+  /* ===== 弹层 ===== */
+  .modal {
+    position: fixed; inset: 0; z-index: 100; display: none;
+    background: rgba(30, 22, 14, .78);
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    padding: calc(18px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom));
+    flex-direction: column;
+  }
+  .modal.show { display: flex; }
+  .modal-head {
+    color: #F5EBD8; font-size: 14px; text-align: center; margin-bottom: 10px;
+    letter-spacing: .5px;
+  }
+  .modal-body {
+    flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    border-radius: 14px; text-align: center; min-height: 0;
+  }
+  .modal-body img { width: 100%; border-radius: 14px; display: block; }
+  .modal-foot { display: flex; gap: 10px; margin-top: 12px; }
+  .modal-foot button, .modal-foot a {
+    flex: 1; text-align: center; border: none; border-radius: 12px;
+    padding: 13px; font-size: 15px; font-weight: 600;
+    font-family: inherit; text-decoration: none; display: block;
+  }
+  #close { background: #F1E7D6; color: #5A4A38; }
+  #dl { background: #fff; color: #B03A2E; }
+
+  /* ===== Toast ===== */
+  #toast {
+    position: fixed; left: 50%; bottom: 130px;
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(43, 33, 24, .92); color: #fff;
+    padding: 10px 20px; border-radius: 20px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: .25s; z-index: 200;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="titlebar">
+    <span class="logo">🍽️</span>
+    <h1>点菜</h1>
+  </div>
+  <div class="searchbox">
+    <input id="q" type="search" placeholder="搜索菜名 / 菜系" autocomplete="off">
+  </div>
+  <div class="tabs" id="tabs"></div>
+</div>
+
+<main id="list"></main>
+
+<div class="bar">
+  <div class="info">已选<b id="cnt">0</b>道菜</div>
+  <button id="clear">清空</button>
+  <button id="make">生成菜单照片</button>
+</div>
+
+<div class="modal" id="modal">
+  <div class="modal-head">长按图片 → 存储到照片</div>
+  <div class="modal-body"><img id="outImg" alt="菜单"></div>
+  <div class="modal-foot">
+    <button id="close">关闭</button>
+    <a id="dl" download="今日菜单.png">打开原图</a>
+  </div>
+</div>
+
+<script>
+/* ======================= 菜系数据 ======================= */
+const CUISINES = [
+  {
+    name: '川菜',
+    cold: ['口水鸡','夫妻肺片','蒜泥白肉','红油耳丝','麻辣牛肉干','凉拌折耳根','椒麻鸡','泡椒凤爪','姜汁豇豆','烧椒皮蛋','凉拌木耳'],
+    hot: ['麻婆豆腐','回锅肉','宫保鸡丁','水煮鱼','毛血旺','鱼香肉丝','辣子鸡','干煸四季豆','开水白菜','酸菜鱼','干锅肥肠','豆瓣鱼','蒜苔炒肉','蚂蚁上树','爆炒腰花','清蒸江团','香辣虾','泡椒牛蛙','樟茶鸭','太白鸭']
+  },
+  {
+    name: '鲁菜',
+    cold: ['酱牛肉','炝拌土豆丝','水晶肘子','凉拌海蜇','五香熏鱼','蒜泥茄子','拌干丝'],
+    hot: ['糖醋鲤鱼','九转大肠','葱烧海参','爆炒腰花','糟溜鱼片','油爆双脆','把子肉','木须肉','四喜丸子','锅塌豆腐','芫爆里脊','奶汤蒲菜','清汤燕菜','德州扒鸡','红烧肘子']
+  },
+  {
+    name: '粤菜',
+    cold: ['白切鸡','烧鹅','蜜汁叉烧','卤水拼盘','凉拌海蜇','白云猪手','潮州冻蟹','凉拌鱼皮'],
+    hot: ['清蒸石斑鱼','白灼虾','豉汁蒸排骨','啫啫鸡煲','避风塘炒蟹','干炒牛河','咕噜肉','梅菜扣肉','老火靓汤','深井烧鹅','盐焗鸡','蚝油生菜','豉椒炒花蛤','脆皮烧肉','蒸水蛋']
+  },
+  {
+    name: '苏菜',
+    cold: ['盐水鸭','镇江肴肉','酱汁肉','拌干丝','五香熏鱼','醉蟹','凉拌马兰头'],
+    hot: ['松鼠鳜鱼','蟹粉狮子头','大煮干丝','响油鳝糊','蟹粉豆腐','叫花鸡','文思豆腐','白袍虾仁','樱桃肉','清炒虾仁','莼菜银鱼羹','母油船鸭']
+  },
+  {
+    name: '浙菜',
+    cold: ['醉鸡','糟卤毛豆','酱鸭','拌海蜇头','咸呛蟹','绍兴醉虾','凉拌笋丝'],
+    hot: ['西湖醋鱼','东坡肉','龙井虾仁','叫化童鸡','宋嫂鱼羹','干菜焖肉','油焖春笋','清蒸鲥鱼','三丝敲鱼','雪菜黄鱼','西湖莼菜汤','生爆鳝片']
+  },
+  {
+    name: '闽菜',
+    cold: ['红糟醉鸡','凉拌海蜇头','白斩河田鸡','糟香螺片','拌鱼皮'],
+    hot: ['佛跳墙','荔枝肉','海蛎煎','白炒虾球','鸡汤汆海蚌','酸甜排骨','太平燕','爆炒双脆','红糟肉','沙茶牛肉','醉糟鸡','七星鱼丸']
+  },
+  {
+    name: '湘菜',
+    cold: ['擂辣椒皮蛋','凉拌黄瓜','湖南腊味拼盘','酸辣蕨根粉','剁椒皮蛋','凉拌豆笋'],
+    hot: ['剁椒鱼头','毛氏红烧肉','辣椒炒肉','湘西外婆菜','腊味合蒸','发丝百叶','东安子鸡','口味虾','农家小炒肉','干锅茶树菇','酸辣鸡杂','组庵鱼翅','剁椒蒸排骨']
+  },
+  {
+    name: '徽菜',
+    cold: ['无为板鸭','凉拌香干','酱鸭','五香牛肉','腌菜拌豆腐'],
+    hot: ['臭鳜鱼','毛豆腐','胡适一品锅','火腿炖甲鱼','清蒸石鸡','徽州圆子','笋干烧肉','黄山炖鸽','中和汤','问政山笋','红烧划水']
+  },
+  {
+    name: '京菜',
+    cold: ['芥末鸭掌','酱肘花','拌肚丝','五香酱牛肉','糖蒜','豌豆黄','炒红果'],
+    hot: ['北京烤鸭','京酱肉丝','醋溜木须','干炸丸子','爆肚','溜肝尖','抓炒里脊','烧茄子','涮羊肉','它似蜜','芥末墩','炸酱面']
+  },
+  {
+    name: '沪菜',
+    cold: ['白斩鸡','熏鱼','酱鸭','烤麸','糟毛豆','醉鸡','油爆虾'],
+    hot: ['红烧肉','糖醋小排','八宝鸭','油面筋塞肉','腌笃鲜','清炒河虾仁','草头圈子','响油鳝丝','水晶虾仁','红烧甩水','蟹粉豆腐']
+  },
+  {
+    name: '东北菜',
+    cold: ['东北大拉皮','蘸酱菜','酱骨架','拍黄瓜','拌木耳','酱牛肉','皮冻'],
+    hot: ['锅包肉','小鸡炖蘑菇','猪肉炖粉条','地三鲜','溜肉段','酸菜白肉','铁锅炖大鹅','杀猪菜','得莫利炖鱼','尖椒干豆腐','白肉血肠','酱大骨']
+  },
+  {
+    name: '豫菜',
+    cold: ['道口烧鸡','拌荆芥','酱牛肉','五香兔肉','凉拌变蛋'],
+    hot: ['糖醋软熘鲤鱼焙面','牡丹燕菜','扒广肚','炸紫酥肉','大葱烧海参','酸辣汤','胡辣汤','炒三不粘','套四宝','开封灌汤包']
+  },
+  {
+    name: '鄂菜',
+    cold: ['凉拌藕带','荆州鱼糕','酱板鸭','卤藕片','凉拌毛豆'],
+    hot: ['清蒸武昌鱼','沔阳三蒸','排骨藕汤','黄陂三合','红烧鮰鱼','藕夹','粉蒸肉','珍珠丸子','三鲜豆皮','热干面']
+  },
+  {
+    name: '赣菜',
+    cold: ['赣南板鸭','酱鸭','凉拌米粉','凉拌折耳根'],
+    hot: ['三杯鸡','南昌瓦罐汤','粉蒸肉','藜蒿炒腊肉','井冈烟笋','庐山石鸡','赣南小炒鱼','荷包辣椒','红烧肉']
+  },
+  {
+    name: '陕菜',
+    cold: ['凉皮','擀面皮','腊牛肉','凉拌木耳','浆水菜','秦镇米皮'],
+    hot: ['羊肉泡馍','葫芦鸡','油泼面','臊子面','水盆羊肉','葫芦头泡馍','温拌腰丝','带把肘子','金边白菜','肉夹馍']
+  },
+  {
+    name: '西北菜',
+    cold: ['酿皮','凉拌牛肉','凉拌沙葱','拌三丝'],
+    hot: ['手抓羊肉','黄焖羊肉','羊肉串','兰州牛肉面','羊杂汤','烤羊排','糊辣羊蹄','洋芋擦擦','浆水面']
+  },
+  {
+    name: '新疆菜',
+    cold: ['皮辣红','凉拌黄面','新疆椒麻鸡','老虎菜'],
+    hot: ['大盘鸡','手抓饭','烤羊肉串','馕包肉','拉条子','烤包子','胡辣羊蹄','羊肉汤','烤全羊','过油肉拌面']
+  },
+  {
+    name: '内蒙菜',
+    cold: ['手把肉','凉拌莜面','奶皮子'],
+    hot: ['烤全羊','烤羊排','羊背子','涮羊肉','莜面窝窝','血肠','风干牛肉','石头烤肉']
+  },
+  {
+    name: '云南菜',
+    cold: ['凉米线','酸辣折耳根','柠檬撒','凉拌树花'],
+    hot: ['过桥米线','汽锅鸡','宣威火腿','野生菌火锅','大救驾','酸辣鱼','香茅草烤鱼','老奶洋芋','菠萝饭','傣味烤鸡']
+  },
+  {
+    name: '贵州菜',
+    cold: ['凉拌折耳根','米豆腐','丝娃娃','凉拌蕨根粉'],
+    hot: ['酸汤鱼','贵州辣子鸡','糟辣椒炒肉','肠旺面','酸汤牛肉','豆米火锅','豆腐圆子','状元蹄']
+  },
+  {
+    name: '客家菜',
+    cold: ['客家咸鸡','白斩鸭','酸菜拌肚丝'],
+    hot: ['客家酿豆腐','梅菜扣肉','盐焗鸡','猪肚包鸡','客家盆菜','酿苦瓜','算盘子','客家黄酒鸡']
+  },
+  {
+    name: '家常菜',
+    cold: ['凉拌黄瓜','凉拌木耳','皮蛋豆腐','大拌菜'],
+    hot: ['番茄炒蛋','酸辣土豆丝','青椒肉丝','红烧茄子','蒜蓉西兰花','清炒时蔬','紫菜蛋花汤','冬瓜排骨汤','番茄牛腩','可乐鸡翅','土豆炖牛肉','蒸水蛋']
+  }
+];
+
+/* ======================= 基础工具 ======================= */
+const FONT = '"PingFang SC","Hiragino Sans GB","Heiti SC","Microsoft YaHei",sans-serif';
+const kk = (c, t, n) => c + '|' + t + '|' + n;
+
+const listEl  = document.getElementById('list');
+const tabsEl  = document.getElementById('tabs');
+const cntEl   = document.getElementById('cnt');
+const modal   = document.getElementById('modal');
+const imgEl   = document.getElementById('outImg');
+const dlEl    = document.getElementById('dl');
+
+const sel = new Map(); // key -> {cuisine, type, name}
+
+/* Toast */
+let toastTimer;
+function toast(msg) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+/* 圆角矩形 */
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* ======================= 渲染列表 ======================= */
+function renderList() {
+  let html = '';
+  CUISINES.forEach((c, i) => {
+    const chipsCold = c.cold.map(n => {
+      const k = kk(c.name, 'cold', n);
+      return `<button class="chip${sel.has(k) ? ' on' : ''}" data-key="${k}" data-name="${n}">${n}</button>`;
+    }).join('');
+    const chipsHot = c.hot.map(n => {
+      const k = kk(c.name, 'hot', n);
+      return `<button class="chip${sel.has(k) ? ' on' : ''}" data-key="${k}" data-name="${n}">${n}</button>`;
+    }).join('');
+
+    html += `
+      <section class="card" id="sec-${i}" data-cuisine="${c.name}">
+        <h2>${c.name}</h2>
+        <div class="group cold"><h3>冷菜</h3><div class="chips">${chipsCold}</div></div>
+        <div class="group hot"><h3>热菜</h3><div class="chips">${chipsHot}</div></div>
+      </section>`;
+  });
+  listEl.innerHTML = html;
+}
+
+function renderTabs() {
+  tabsEl.innerHTML = CUISINES
+    .map((c, i) => `<button data-idx="${i}">${c.name}</button>`)
+    .join('');
+}
+
+function updateCount() {
+  cntEl.textContent = sel.size;
+}
+
+/* ======================= 交互 ======================= */
+listEl.addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (!chip) return;
+  const k = chip.dataset.key;
+  if (sel.has(k)) {
+    sel.delete(k);
+    chip.classList.remove('on');
+  } else {
+    const parts = k.split('|');
+    sel.set(k, { cuisine: parts[0], type: parts[1], name: parts[2] });
+    chip.classList.add('on');
+  }
+  updateCount();
+});
+
+tabsEl.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const sec = document.getElementById('sec-' + b.dataset.idx);
+  if (!sec) return;
+  const topEl = document.querySelector('.top');
+  const offset = topEl ? topEl.offsetHeight : 130;
+  const y = sec.getBoundingClientRect().top + window.pageYOffset - offset - 8;
+  window.scrollTo({ top: Math.max(y, 0), behavior: 'smooth' });
+});
+
+/* 搜索过滤 */
+const qEl = document.getElementById('q');
+qEl.addEventListener('input', () => {
+  const q = qEl.value.trim();
+  document.querySelectorAll('.card').forEach(card => {
+    const cuisineName = card.dataset.cuisine;
+    let visible = 0;
+    card.querySelectorAll('.group').forEach(g => {
+      let v = 0;
+      g.querySelectorAll('.chip').forEach(ch => {
+        const name = ch.dataset.name;
+        const match = !q || name.includes(q) || cuisineName.includes(q);
+        ch.style.display = match ? '' : 'none';
+        if (match) v++;
+      });
+      g.style.display = v ? '' : 'none';
+      visible += v;
+    });
+    card.style.display = visible ? '' : 'none';
+  });
+});
+
+/* 清空 */
+document.getElementById('clear').addEventListener('click', () => {
+  if (!sel.size) return;
+  sel.clear();
+  document.querySelectorAll('.chip.on').forEach(c => c.classList.remove('on'));
+  updateCount();
+  toast('已清空');
+});
+
+/* ======================= 生成菜单图片 ======================= */
+function generateImage() {
+  /* 1. 按菜系分组收集已选 */
+  const groups = [];
+  CUISINES.forEach(c => {
+    const cold = c.cold.filter(n => sel.has(kk(c.name, 'cold', n)));
+    const hot  = c.hot.filter(n => sel.has(kk(c.name, 'hot', n)));
+    if (cold.length || hot.length) groups.push({ name: c.name, cold, hot });
+  });
+
+  if (!groups.length) {
+    toast('还没有选菜，先点几道吧～');
+    return;
+  }
+
+  const W = 750;
+  const PAD = 62;
+  const blocks = [];
+  const add = (h, draw) => blocks.push({ h, draw: draw || (() => {}) });
+
+  /* 菜品行绘制器 */
+  const dishDrawer = (name) => (ctx, y) => {
+    ctx.beginPath();
+    ctx.arc(PAD + 9, y + 26, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#C9A961';
+    ctx.fill();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#33291F';
+    ctx.font = `28px ${FONT}`;
+    ctx.fillText(name, PAD + 28, y + 36);
+  };
+
+  /* 分组小标签绘制器 */
+  const tagDrawer = (label, color, bg) => (ctx, y) => {
+    ctx.font = `600 23px ${FONT}`;
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = bg;
+    roundRect(ctx, PAD, y + 8, tw + 34, 36, 18);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left';
+    ctx.fillText(label, PAD + 17, y + 33);
+  };
+
+  /* ---------- 顶部 ---------- */
+  add(46);
+  add(88, (ctx, y) => {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#2B2118';
+    ctx.font = `700 52px ${FONT}`;
+    ctx.fillText('今 日 菜 单', W / 2, y + 62);
+  });
+
+  const d = new Date();
+  const dateStr = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 · 星期${'日一二三四五六'[d.getDay()]}`;
+  add(52, (ctx, y) => {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#A08A6A';
+    ctx.font = `25px ${FONT}`;
+    ctx.fillText(dateStr, W / 2, y + 32);
+  });
+
+  /* 装饰分隔线 */
+  add(58, (ctx, y) => {
+    const cy = y + 26;
+    ctx.strokeStyle = '#E2D3B6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(PAD, cy);
+    ctx.lineTo(W / 2 - 30, cy);
+    ctx.moveTo(W / 2 + 30, cy);
+    ctx.lineTo(W - PAD, cy);
+    ctx.stroke();
+
+    ctx.fillStyle = '#C9A961';
+    ctx.save();
+    ctx.translate(W / 2, cy);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillRect(-7, -7, 14, 14);
+    ctx.restore();
+  });
+
+  /* ---------- 菜系内容 ---------- */
+  groups.forEach(g => {
+    add(78, (ctx, y) => {
+      ctx.fillStyle = '#B03A2E';
+      roundRect(ctx, PAD, y + 22, 7, 34, 3.5);
+      ctx.fill();
+
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#2B2118';
+      ctx.font = `700 38px ${FONT}`;
+      ctx.fillText(g.name, PAD + 26, y + 52);
+    });
+
+    if (g.cold.length) {
+      add(52, tagDrawer('冷菜', '#2E7D6B', '#E4F2EE'));
+      g.cold.forEach(n => add(52, dishDrawer(n)));
+    }
+    if (g.hot.length) {
+      add(52, tagDrawer('热菜', '#C0392B', '#FBE9E2'));
+      g.hot.forEach(n => add(52, dishDrawer(n)));
+    }
+
+    add(22);
+  });
+
+  /* ---------- 底部 ---------- */
+  add(26);
+  add(46, (ctx, y) => {
+    const cy = y + 20;
+    ctx.strokeStyle = '#E2D3B6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(PAD, cy);
+    ctx.lineTo(W - PAD, cy);
+    ctx.stroke();
+  });
+
+  const total = groups.reduce((s, g) => s + g.cold.length + g.hot.length, 0);
+  const coldN = groups.reduce((s, g) => s + g.cold.length, 0);
+  add(72, (ctx, y) => {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8A7554';
+    ctx.font = `600 26px ${FONT}`;
+    ctx.fillText(`共 ${total} 道菜 · 冷菜 ${coldN} · 热菜 ${total - coldN}`, W / 2, y + 40);
+  });
+  add(56);
+
+  /* ---------- 计算尺寸 ---------- */
+  let H = 0;
+  blocks.forEach(b => { H += b.h; });
+
+  let scale = 2;
+  if (H * scale > 12000) scale = 1.5;
+  if (H * scale > 16000) scale = 1;
+
+  const canvas = document.createElement('canvas');
+  canvas.width  = Math.round(W * scale);
+  canvas.height = Math.round(H * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+  ctx.textBaseline = 'alphabetic';
+
+  /* 背景 */
+  ctx.fillStyle = '#FFFCF5';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#E6D8BC';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(28, 28, W - 56, H - 56);
+
+  /* 逐块绘制 */
+  let y = 0;
+  blocks.forEach(b => {
+    b.draw(ctx, y);
+    y += b.h;
+  });
+
+  /* ---------- 输出 ---------- */
+  const url = canvas.toDataURL('image/png');
+  imgEl.src = url;
+  dlEl.href = url;
+  modal.classList.add('show');
+  modal.querySelector('.modal-body').scrollTop = 0;
+}
+
+/* 按钮事件 */
+document.getElementById('make').addEventListener('click', generateImage);
+document.getElementById('close').addEventListener('click', () => modal.classList.remove('show'));
+
+/* ======================= 启动 ======================= */
+renderTabs();
+renderList();
+updateCount();
+</script>
+</body>
+</html>
